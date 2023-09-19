@@ -40,6 +40,8 @@ public class Server {
     private static final String SONGS_FILE = "availableSongs.txt";
     private final ConcurrentHashMap<Integer, Boolean> stopMap;
     private final ServerHelper serverHelper;
+    private boolean shouldRun;
+    private Selector selector;
 
     public Server(Executor commandExecutor, int port) {
         this.stopMap = new ConcurrentHashMap<>();
@@ -47,6 +49,7 @@ public class Server {
         this.buffer = ByteBuffer.allocate(BUFFER_SIZE);
         this.executor = commandExecutor;
         this.serverHelper = new ServerHelper();
+        this.shouldRun = true;
     }
 
     public void startServer() {
@@ -55,12 +58,12 @@ public class Server {
             serverChannel.bind(new InetSocketAddress(SERVER_HOST, this.port));
             serverChannel.configureBlocking(false);
 
-            Selector selector = Selector.open();
+            selector = Selector.open();
             serverChannel.register(selector, SelectionKey.OP_ACCEPT);
 
             System.out.println("New Server is created!");
 
-            while (true) {
+            while (shouldRun) {
 
                 int readyChannels = selector.select();
 
@@ -101,12 +104,21 @@ public class Server {
                     keyIterator.remove();
                 }
             }
+            selector.close();
         } catch (IOException e) {
             String message = "There is a problem with the server socket!" + SPACE + e;
             System.out.println(message);
             serverHelper.handleSystemError("IO Exception", e);
         }
 
+    }
+
+    public void stop() {
+        shouldRun = false;
+
+        if (selector.isOpen()) {
+            selector.wakeup();
+        }
     }
 
     private void executionInput(SocketChannel commandChannel, String clientInput) throws IOException, SpotifyExceptions,
