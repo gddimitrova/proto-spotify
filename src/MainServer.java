@@ -1,4 +1,4 @@
-import bg.sofia.uni.fmi.mjt.spotify.command.Executor;
+import bg.sofia.uni.fmi.mjt.spotify.command.CommandExecutor;
 import bg.sofia.uni.fmi.mjt.spotify.server.Server;
 import bg.sofia.uni.fmi.mjt.spotify.server.SpotifyServer;
 
@@ -21,15 +21,15 @@ public class MainServer {
                 Writer userWriter = new FileWriter(USERS_FILE, true);
                 Reader songsReader = new FileReader(SONGS_FILE)
         ) {
-            Executor commandExecutor = new Executor(userReader, userWriter, songsReader );
+            CommandExecutor commandExecutor = new CommandExecutor(userReader, userWriter, songsReader );
 
             Server server = new SpotifyServer(commandExecutor, new InetSocketAddress(SERVER_HOST, SERVER_PORT));
             Thread serverThread = new Thread(server);
             serverThread.start();
 
-        } catch (IOException e) {
+            serverThread.join();
+        } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
-
     }
 }

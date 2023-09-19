@@ -35,11 +35,11 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-public class ExecutorTest {
+public class CommandExecutorTest {
 
     private static final String[] USER_NAMES = {"maria@gmail.com", "pesho@gmail.com", "toshko@gmail.com"};
     private static final String[] SONG_NAMES = {"numberCount", "Redbone", "song", "Why i love you"};
-    private static Executor executor;
+    private static CommandExecutor commandExecutor;
     private static final int ID = 0;
     private static final int USER_ID = 2;
     private static final String SPACE = " ";
@@ -71,27 +71,27 @@ public class ExecutorTest {
             }
         }
 
-        executor = new Executor(userReader, userWriter, songReader);
+        commandExecutor = new CommandExecutor(userReader, userWriter, songReader);
     }
 
     @Test
     public void testEmailsCreatedSuccessfully() {
-        assertTrue(executor.getEmails().keySet().containsAll(Arrays.stream(USER_NAMES).toList()),
+        assertTrue(commandExecutor.getEmails().keySet().containsAll(Arrays.stream(USER_NAMES).toList()),
                 "Not all names contains in the email list!");
     }
 
     @Test
     public void testSongsCreatedSuccessfully() {
-        assertEquals(executor.getSongs().size(), SIZE,
+        assertEquals(commandExecutor.getSongs().size(), SIZE,
                 "Invalid size of the songs list! Check creation of this list!");
-        assertTrue(executor.getSongs().keySet().containsAll(Arrays.stream(SONG_NAMES)
+        assertTrue(commandExecutor.getSongs().keySet().containsAll(Arrays.stream(SONG_NAMES)
                         .map(String::toLowerCase).toList()),
                 "Not all songs contains in the song list!");
     }
 
     @Test
     public void testValidateCommandNotExistingThrowsException() {
-        assertThrows(NoSuchCommandException.class, () -> executor.execute("2 execute"),
+        assertThrows(NoSuchCommandException.class, () -> commandExecutor.execute("2 execute"),
                 "Unknown commands should throw exception!");
     }
 
@@ -106,7 +106,7 @@ public class ExecutorTest {
     @Test
     public void testRegisterInvalidArgumentsThrowsException() {
         String register = getInput(ID, AvailableCommands.REGISTER.getName());
-        assertThrows(InvalidCommandException.class, () -> executor.execute(register),
+        assertThrows(InvalidCommandException.class, () -> commandExecutor.execute(register),
                 "Register with no arguments should throw exception!");
     }
 
@@ -114,133 +114,133 @@ public class ExecutorTest {
     public void testRegisterInvalidArgumentsMoreThanExpectedThrowsException() {
         String register = getInput(ID, AvailableCommands.REGISTER.getName(),
                 "john@gmail.com", "tra", "volta");
-        assertThrows(InvalidCommandException.class, () -> executor.execute(register),
+        assertThrows(InvalidCommandException.class, () -> commandExecutor.execute(register),
                 "Register with more than expected arguments should throw exception!");
     }
 
     @Test
     public void testRegisterWithExistingEmailThrowsException() {
         String register = getInput(ID, AvailableCommands.REGISTER.getName(), "pesho@gmail.com", "passWord");
-        assertThrows(SpotifyAccountAlreadyExistsException.class, () -> executor.execute(register),
+        assertThrows(SpotifyAccountAlreadyExistsException.class, () -> commandExecutor.execute(register),
                 "Register with mail that already exists should throw exception!");
     }
 
     @Test
     public void testRegisterWithInvalidPasswordFormatThrowsException() {
         String register = getInput(ID, AvailableCommands.REGISTER.getName(), "someone@gmail.com", "pass");
-        assertThrows(InvalidPasswordException.class, () -> executor.execute(register),
+        assertThrows(InvalidPasswordException.class, () -> commandExecutor.execute(register),
                 "Invalid password format should throw exception!");
     }
 
     @Test
     public void testRegisterWithInvalidEmailFormatThrowsException() {
         String register = getInput(ID, AvailableCommands.REGISTER.getName(), "someoneNew", "NewPa$$1");
-        assertThrows(InvalidEmailException.class, () -> executor.execute(register));
+        assertThrows(InvalidEmailException.class, () -> commandExecutor.execute(register));
     }
 
     @Test
     public void testRegisterWorksCorrectly() throws IOException, SpotifyExceptions {
         String register = getInput(ID, AvailableCommands.REGISTER.getName(),
                 "newAccount@gmail.com", "NewPa$$12");
-        executor.execute(register);
-        assertEquals(executor.getUsers().size(), SIZE,
+        commandExecutor.execute(register);
+        assertEquals(commandExecutor.getUsers().size(), SIZE,
                 "Adding new account does not work correctly!");
-        assertTrue(executor.getEmails().containsKey("newAccount@gmail.com"),
+        assertTrue(commandExecutor.getEmails().containsKey("newAccount@gmail.com"),
                 "Adding new account does not work correctly!");
-        assertEquals(executor.getUsers().get(SIZE).email(), "newAccount@gmail.com",
+        assertEquals(commandExecutor.getUsers().get(SIZE).email(), "newAccount@gmail.com",
                 "Adding new account does not work correctly!");
     }
 
     @Test
     public void testLoginWithInvalidArgumentsThrowsException() {
         String login = getInput(ID, AvailableCommands.LOGIN.getName());
-        assertThrows(InvalidCommandException.class, () -> executor.execute(login),
+        assertThrows(InvalidCommandException.class, () -> commandExecutor.execute(login),
                 "Login with no arguments should throw exception!");
     }
 
     @Test
     public void testLoginWithLessArgumentsThrowsException() {
         String login = getInput(ID, AvailableCommands.LOGIN.getName(), "pesho@gmail.com");
-        assertThrows(InvalidCommandException.class, () -> executor.execute(login),
+        assertThrows(InvalidCommandException.class, () -> commandExecutor.execute(login),
                 "Login with less arguments should throw exception!");
     }
 
     @Test
     public void testLoginWithoutAccountThrowsException() {
         String login = getInput(ID, AvailableCommands.LOGIN.getName(), "kalina@abv.bg", "kaliPass");
-        assertThrows(NoSuchUserException.class, () -> executor.execute(login),
+        assertThrows(NoSuchUserException.class, () -> commandExecutor.execute(login),
                 "Login without account should throw exception!");
     }
 
     @Test
     public void testLoginWithInvalidPasswordThrowsException() {
         String login = getInput(ID, AvailableCommands.LOGIN.getName(), "pesho@gmail.com", "pesho");
-        assertThrows(InvalidPasswordException.class, () -> executor.execute(login),
+        assertThrows(InvalidPasswordException.class, () -> commandExecutor.execute(login),
                 "Login with invalid password should throw exception!");
     }
 
     @Test
     public void testLoginWorksCorrectly() throws IOException, SpotifyExceptions {
         String login = getInput(ID, AvailableCommands.LOGIN.getName(), "pesho@gmail.com", "peshko");
-        assertEquals(Integer.parseInt(executor.execute(login)), 2,
+        assertEquals(Integer.parseInt(commandExecutor.execute(login)), 2,
                 "Login should return string of the user id!");
     }
 
     @Test
     public void testSearchWithoutWordsThrowsException() {
         String search = getInput(USER_ID, AvailableCommands.SEARCH.getName());
-        assertThrows(InvalidCommandException.class, () -> executor.execute(search),
+        assertThrows(InvalidCommandException.class, () -> commandExecutor.execute(search),
                 "Searching without provided words should throw exception!");
     }
 
     @Test
     public void testSearchWithoutLoginOrRegisterThrowsException() {
         String search = getInput(ID, AvailableCommands.SEARCH.getName());
-        assertThrows(NoSuchUserException.class, () -> executor.execute(search),
+        assertThrows(NoSuchUserException.class, () -> commandExecutor.execute(search),
                 "Searching for words before login or registration should throw exception!");
     }
 
     @Test
     public void testSearchingForMissingWordsWorksCorrectly() throws IOException, SpotifyExceptions {
         String search = getInput(USER_ID, AvailableCommands.SEARCH.getName(), "horse");
-        assertEquals(executor.execute(search), "[]",
+        assertEquals(commandExecutor.execute(search), "[]",
                 "Should return empty list when non of the words match!");
     }
 
     @Test
     public void testSearchWorksCorrectly() throws IOException, SpotifyExceptions {
         String search = getInput(USER_ID, AvailableCommands.SEARCH.getName(), "why");
-        String result = "[" + executor.getSongs().get("why i love you").toString() + "]";
-        assertEquals(executor.execute(search), result,
+        String result = "[" + commandExecutor.getSongs().get("why i love you").toString() + "]";
+        assertEquals(commandExecutor.execute(search), result,
                 "Search method does not work correctly!");
     }
 
     @Test
     public void testTopWithoutArgumentsThrowsException() {
         String top = getInput(USER_ID, AvailableCommands.TOP.getName());
-        assertThrows(InvalidCommandException.class, () -> executor.execute(top),
+        assertThrows(InvalidCommandException.class, () -> commandExecutor.execute(top),
                 "Top without arguments should throw exception!");
     }
 
     @Test
     public void testTopWithMoreThanOneArgumentThrowsException() {
         String top = getInput(USER_ID, AvailableCommands.TOP.getName(), "1", "3");
-        assertThrows(InvalidCommandException.class, () -> executor.execute(top),
+        assertThrows(InvalidCommandException.class, () -> commandExecutor.execute(top),
                 "No more than one argument should be provided for top!");
     }
 
     @Test
     public void testTopWorksCorrectly() throws IOException, SpotifyExceptions {
         String top = getInput(USER_ID, AvailableCommands.TOP.getName(), "1");
-        String result = "[" + executor.getSongs().get("why i love you").toString() + "]";
-        assertEquals(executor.execute(top), result,
+        String result = "[" + commandExecutor.getSongs().get("why i love you").toString() + "]";
+        assertEquals(commandExecutor.execute(top), result,
                 "Top method does not work correctly!");
     }
 
     @Test
     public void testCreatePlaylistWithoutArgumentsThrowsException() {
         String create = getInput(USER_ID, AvailableCommands.CREATE_PLAYLIST.getName());
-        assertThrows(InvalidCommandException.class, () -> executor.execute(create),
+        assertThrows(InvalidCommandException.class, () -> commandExecutor.execute(create),
                 "Name of the playlist should be provided when creating a new one!");
 
     }
@@ -248,42 +248,42 @@ public class ExecutorTest {
     @Test
     public void testCreatePlaylistWithPlaylistThatExistsThrowsException() {
         String create = getInput(USER_ID, AvailableCommands.CREATE_PLAYLIST.getName(), "testFile");
-        assertThrows(PlaylistAlreadyExistsException.class, () -> executor.execute(create),
+        assertThrows(PlaylistAlreadyExistsException.class, () -> commandExecutor.execute(create),
                 "Creating playlist that already exists should throw exception!");
     }
 
     @Test
     public void testCreatePlaylistWorksCorrectly() throws IOException, SpotifyExceptions {
         String create = getInput(USER_ID, AvailableCommands.CREATE_PLAYLIST.getName(), "newTestFile");
-        executor.execute(create);
+        commandExecutor.execute(create);
 
         String[] listOfFiles = new File(PLAYLISTS).list();
         assertNotNull(listOfFiles);
         assertTrue(Arrays.stream(listOfFiles).toList().contains("2 newTestFile.txt"),
                 "Playlist should be in the playlists directory after creating it!");
-        assertTrue(executor.getPlaylist().contains("2 newTestFile.txt"),
+        assertTrue(commandExecutor.getPlaylist().contains("2 newTestFile.txt"),
                 "Creating playlist does not work correctly!");
     }
 
     @Test
     public void testShowPlaylistWithInvalidArgumentsThrowsException() {
         String show = getInput(USER_ID, AvailableCommands.SHOW_PLAYLIST.getName());
-        assertThrows(InvalidCommandException.class, () -> executor.execute(show),
+        assertThrows(InvalidCommandException.class, () -> commandExecutor.execute(show),
                 "Show-playlist without arguments should throw exception!");
     }
 
     @Test
     public void testShowPlaylistWithNonExistingPlaylistThrowsException() {
         String show = getInput(USER_ID, AvailableCommands.SHOW_PLAYLIST.getName(), "test");
-        assertThrows(NoSuchPlaylistException.class, () -> executor.execute(show),
+        assertThrows(NoSuchPlaylistException.class, () -> commandExecutor.execute(show),
                 "Showing non-existing playlist should throw exception!");
     }
 
     @Test
     public void testShowPlaylistWorksCorrectly() throws IOException, SpotifyExceptions {
         String show = getInput(USER_ID, AvailableCommands.SHOW_PLAYLIST.getName(), "testFile");
-        String result = "[" + executor.getSongs().get(SONG).toString() + "]";
-        assertEquals(result, executor.execute(show),
+        String result = "[" + commandExecutor.getSongs().get(SONG).toString() + "]";
+        assertEquals(result, commandExecutor.execute(show),
                 "Showing playlist does not work correctly!");
     }
 
@@ -291,7 +291,7 @@ public class ExecutorTest {
     @Test
     public void testAddSongToInvalidArgumentsThrowsException() {
         String addCommand = getInput(USER_ID, AvailableCommands.ADD_SONG.getName(), TEST_FILE);
-        assertThrows(InvalidCommandException.class, () -> executor.execute(addCommand),
+        assertThrows(InvalidCommandException.class, () -> commandExecutor.execute(addCommand),
                 "Invalid arguments should throw exception!");
     }
 
@@ -299,7 +299,7 @@ public class ExecutorTest {
     public void testAddSongToInvalidPlaylistThrowsException() {
         String addCommand = getInput(USER_ID, AvailableCommands.ADD_SONG.getName(),
                 "\"newTestFile\"", "\"why i love you\"");
-        assertThrows(NoSuchPlaylistException.class, () -> executor.execute(addCommand),
+        assertThrows(NoSuchPlaylistException.class, () -> commandExecutor.execute(addCommand),
                 "Non existing playlist should throw exception!");
     }
 
@@ -307,7 +307,7 @@ public class ExecutorTest {
     public void testAddSongToInvalidSongThrowsException() {
         String addCommand = getInput(USER_ID, AvailableCommands.ADD_SONG.getName(),
                 TEST_FILE, "\"why i love me\"");
-        assertThrows(NoSuchSongException.class, () ->executor.execute(addCommand),
+        assertThrows(NoSuchSongException.class, () -> commandExecutor.execute(addCommand),
                 "Non existing song should throw exception!");
     }
 
@@ -315,7 +315,7 @@ public class ExecutorTest {
     public void testAddSongWorksCorrectly() throws IOException, SpotifyExceptions {
         String addCommand = getInput(USER_ID, AvailableCommands.ADD_SONG.getName(),
                 TEST_FILE, "\"song\"");
-        executor.execute(addCommand);
+        commandExecutor.execute(addCommand);
 
         Path path = Paths.get(FILE_ONE);
         List<String> lines = Files.readAllLines(path);
@@ -329,29 +329,29 @@ public class ExecutorTest {
     public void testPlaySongWithInvalidArgumentsThrowsException() {
         String playCommand = getInput(USER_ID, AvailableCommands.PLAY.getName());
 
-        assertThrows(InvalidCommandException.class, () -> executor.execute(playCommand),
+        assertThrows(InvalidCommandException.class, () -> commandExecutor.execute(playCommand),
                 "Play without arguments should throw exception!");
     }
 
     @Test
     public void testPlaySongWithUnknownSongThrowsException() {
         String playCommand = getInput(USER_ID, AvailableCommands.PLAY.getName(), "unknown");
-        assertThrows(NoSuchSongException.class, () -> executor.execute(playCommand),
+        assertThrows(NoSuchSongException.class, () -> commandExecutor.execute(playCommand),
                 "Playing unknown song should throw exception!");
     }
 
     @Test
     public void testPlaySongWorksCorrectly() throws IOException, SpotifyExceptions {
         String playCommand = getInput(USER_ID, AvailableCommands.PLAY.getName(), "why i love you");
-        executor.execute(playCommand);
-        assertEquals(executor.getSongs().get("why i love you").getCountPlays(), 2,
+        commandExecutor.execute(playCommand);
+        assertEquals(commandExecutor.getSongs().get("why i love you").getCountPlays(), 2,
                 "Play should increment the count streams of the song!");
     }
 
     @Test
     public void testStopWithInvalidArgumentsThrowsException() {
         String stop = getInput(USER_ID, AvailableCommands.STOP.getName(), SONG);
-        assertThrows(InvalidCommandException.class, () -> executor.execute(stop),
+        assertThrows(InvalidCommandException.class, () -> commandExecutor.execute(stop),
                 "No arguments should be provided!");
     }
 

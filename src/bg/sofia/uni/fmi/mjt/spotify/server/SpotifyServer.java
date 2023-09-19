@@ -1,7 +1,7 @@
 package bg.sofia.uni.fmi.mjt.spotify.server;
 
 import bg.sofia.uni.fmi.mjt.spotify.command.AvailableCommands;
-import bg.sofia.uni.fmi.mjt.spotify.command.Executor;
+import bg.sofia.uni.fmi.mjt.spotify.command.CommandExecutor;
 import bg.sofia.uni.fmi.mjt.spotify.exceptions.SpotifyExceptions;
 
 import javax.sound.sampled.UnsupportedAudioFileException;
@@ -30,17 +30,17 @@ public class SpotifyServer implements Server {
     private final ServerErrorHandler serverErrorHandler;
     private final InetSocketAddress socketAddress;
     private final ByteBuffer buffer;
-    private final Executor executor;
+    private final CommandExecutor commandExecutor;
     private Selector selector;
 
     private final ConcurrentHashMap<Integer, Boolean> stopMap;
     private boolean shouldRun;
 
-    public SpotifyServer(Executor commandExecutor, InetSocketAddress socketAddress) {
+    public SpotifyServer(CommandExecutor commandExecutor, InetSocketAddress socketAddress) {
         this.socketAddress = socketAddress;
         this.stopMap = new ConcurrentHashMap<>();
         this.buffer = ByteBuffer.allocate(BUFFER_SIZE);
-        this.executor = commandExecutor;
+        this.commandExecutor = commandExecutor;
         this.serverErrorHandler = new ServerErrorHandler(this.buffer);
         this.shouldRun = true;
     }
@@ -122,7 +122,7 @@ public class SpotifyServer implements Server {
     private void executeInput(SocketChannel commandChannel, String clientInput) throws IOException, SpotifyExceptions,
             UnsupportedAudioFileException, InterruptedException {
 
-        String output = executor.execute(clientInput);
+        String output = commandExecutor.execute(clientInput);
         boolean isAudioOperation = output.contains(SEMICOLON);
 
         if (isAudioOperation) {

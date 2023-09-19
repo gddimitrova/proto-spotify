@@ -26,7 +26,6 @@ public class SpotifyClient implements Client {
 
     @Override
     public void start() {
-
         try (
             SocketChannel commandsChannel = SocketChannel.open();
             SocketChannel playChannel = SocketChannel.open();
@@ -82,9 +81,4 @@ public class SpotifyClient implements Client {
             System.out.println("Unable to connect to the server. Please try again later");
         }
     }
-
-//    public static void main(String[] args) {
-//        new SpotifyClient().start();
-//    }
-
 }

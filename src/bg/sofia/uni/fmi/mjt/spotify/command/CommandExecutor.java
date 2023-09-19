@@ -10,6 +10,7 @@ import bg.sofia.uni.fmi.mjt.spotify.exceptions.NoSuchUserException;
 import bg.sofia.uni.fmi.mjt.spotify.exceptions.PlaylistAlreadyExistsException;
 import bg.sofia.uni.fmi.mjt.spotify.exceptions.SpotifyAccountAlreadyExistsException;
 import bg.sofia.uni.fmi.mjt.spotify.exceptions.SpotifyExceptions;
+import bg.sofia.uni.fmi.mjt.spotify.memory.MemoryStorage;
 import bg.sofia.uni.fmi.mjt.spotify.song.Song;
 import bg.sofia.uni.fmi.mjt.spotify.user.User;
 
@@ -21,19 +22,14 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.Writer;
-import java.nio.file.DirectoryStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
-public class Executor {
+public class CommandExecutor {
 
     public static final String REGISTER = "register";
     public static final String LOGIN = "login";
@@ -60,71 +56,20 @@ public class Executor {
     private static final String CHARACTER = ".*[,$!@#?].*";
     private static final String MAIL_REGEX = "^[a-zA-Z\\d\\-@$!%*?&_.]+@[a-z.]+.(com|bg)$";
     private static final int MIN_LETTERS = 8;
-    private final Reader userReader;
+
     private final Writer userWriter;
-    private final Reader songReader;
 
-    public Executor(Reader userReader, Writer userWriter, Reader songReader) {
-        this.userReader = userReader;
+    public CommandExecutor(Reader userReader, Writer userWriter, Reader songReader) {
+        MemoryStorage memoryStorage  = new MemoryStorage(userReader, songReader);
+
         this.userWriter = userWriter;
-        this.songReader = songReader;
 
-        this.users = new HashMap<>();
-        this.emails = new HashMap<>();
-        this.songs = new HashMap<>();
-        this.playlist = new ArrayList<>();
+        this.users = memoryStorage.getUsers();
+        this.emails = memoryStorage.getEmails();
+        this.songs = memoryStorage.getSongs();
+        this.playlist = memoryStorage.getPlaylist();
 
-        setUpUsers();
-        setUpSongs();
-        setUpPlaylists();
-    }
-
-    private void setUpUsers() {
-        try (var bufferedReader = new BufferedReader(userReader)) {
-            List<User> userList = bufferedReader.lines()
-                    .skip(ONE)
-                    .filter(p -> !p.isBlank())
-                    .map(User::of)
-                    .toList();
-
-            if (userList.size() > ZERO) {
-                currId = userList.get(userList.size() - ONE).id();
-
-                for (User each : userList) {
-                    users.put(each.id(), each);
-                    emails.put(each.email(), each.id());
-                }
-            }
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-        currId++;
-
-    }
-
-    private void setUpSongs() {
-        try (var bufferedReader = new BufferedReader(songReader)) {
-            List<Song> songsList = bufferedReader.lines()
-                    .filter(p -> !p.isBlank())
-                    .map(Song::of)
-                    .toList();
-
-            for (Song each : songsList) {
-                songs.put(each.getName().toLowerCase(), each);
-            }
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-    private void setUpPlaylists() {
-        Path dir = Path.of("playlists");
-        try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir)) {
-            for (Path each : stream) {
-                playlist.add(each.getName(ONE).toString());
-            }
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        currId = MemoryStorage.getCurrId();
     }
 
     private void validateCommand(Command newCommand) throws SpotifyExceptions {
