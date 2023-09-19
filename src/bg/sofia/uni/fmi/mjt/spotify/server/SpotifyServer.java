@@ -21,14 +21,20 @@ public class SpotifyServer implements Server {
     private static final String ERROR = "ERROR:";
     private static final String SPACE = " ";
     private static final String SEMICOLON = ";";
+    private static final String PLAY = "PLAY;";
+    private static final String STOP = "STOP";
+    private static final String SERVER_ERROR = "An unexpected error occurred with the server!";
+    private static final String CONNECTION_CLOSED = "Client has closed the connection";
+    private static final String CONNECTION_ACCEPTED = "Connection accepted for client ";
+
+    private final ServerErrorHandler serverErrorHandler;
     private final InetSocketAddress socketAddress;
     private final ByteBuffer buffer;
     private final Executor executor;
+    private Selector selector;
 
     private final ConcurrentHashMap<Integer, Boolean> stopMap;
-    private final ServerErrorHandler serverErrorHandler;
     private boolean shouldRun;
-    private Selector selector;
 
     public SpotifyServer(Executor commandExecutor, InetSocketAddress socketAddress) {
         this.socketAddress = socketAddress;
@@ -75,7 +81,6 @@ public class SpotifyServer implements Server {
                     }
                     if (key.isReadable()) {
                         SocketChannel commandChannel = (SocketChannel) key.channel();
-
                         processInput(commandChannel);
                     }
                     keyIterator.remove();
@@ -83,8 +88,8 @@ public class SpotifyServer implements Server {
             }
             selector.close();
         } catch (IOException e) {
-            System.out.println(String.join(SPACE, "There is a problem with the server socket!", e.toString()));
-            serverErrorHandler.handleSystemError("IO Exception", e);
+            System.out.println(String.join(SPACE, SERVER_ERROR, e.toString()));
+            serverErrorHandler.handleSystemError(SERVER_ERROR, e);
         }
     }
 
@@ -107,7 +112,6 @@ public class SpotifyServer implements Server {
             executeInput(commandChannel, clientInput);
         } catch (SpotifyExceptions e) {
             serverErrorHandler.writeClientError(commandChannel, ERROR, e.getMessage());
-
         } catch (UnsupportedAudioFileException | InterruptedException e) {
             String clientId = "Client ID: " + clientInput.substring(0, clientInput.indexOf(SPACE));
             serverErrorHandler.writeClientError(commandChannel, ERROR, e.getMessage(), clientId);
@@ -121,11 +125,12 @@ public class SpotifyServer implements Server {
         String output = executor.execute(clientInput);
         boolean isAudioOperation = output.contains(SEMICOLON);
 
-
         if (isAudioOperation) {
-            boolean shouldPlaySong = output.contains("PLAY;");
-            boolean shouldStopSong = output.contains("STOP;");
+            boolean shouldPlaySong = output.contains(PLAY);
+            boolean shouldStopSong = output.contains(STOP);
+
             int currId = Integer.parseInt(clientInput.substring(0, clientInput.indexOf(" ")));
+
             if (shouldPlaySong) {
                 stopMap.put(currId, false);
                 String fileName = output.split(SEMICOLON)[1];
@@ -138,37 +143,37 @@ public class SpotifyServer implements Server {
             }
             if (shouldStopSong) {
                 stopMap.put(currId, true);
-                writeClient(commandChannel, AvailableCommands.STOP.getName().getBytes());
+                writeClient(commandChannel, AvailableCommands.STOP.getName());
             }
-
         } else {
-            writeClient(commandChannel, output.getBytes());
+            writeClient(commandChannel, output);
         }
     }
 
-
-    private void writeClient(SocketChannel clientChannel, byte[] output) throws IOException {
+    private void writeClient(SocketChannel clientChannel, String output) throws IOException {
         buffer.clear();
-        buffer.put(output);
+        buffer.put(output.getBytes());
         buffer.put(System.lineSeparator().getBytes());
 
         buffer.flip();
         clientChannel.write(buffer);
     }
+
     private void  acceptClient(SelectionKey key, Selector selector) throws IOException {
         ServerSocketChannel server = (ServerSocketChannel) key.channel();
+
         SocketChannel clientAccepted = server.accept();
         clientAccepted.configureBlocking(false);
         clientAccepted.register(selector, SelectionKey.OP_READ);
 
-        System.out.println("Connection accepted for client " + clientAccepted.getRemoteAddress());
+        System.out.println(CONNECTION_ACCEPTED + clientAccepted.getRemoteAddress());
     }
 
     private String getClientInput(SocketChannel clientChannel) throws IOException {
         buffer.clear();
-        int r = clientChannel.read(buffer);
-        if (r < 0) {
-            System.out.println("Client has closed the connection");
+
+        if (clientChannel.read(buffer) < 0) {
+            System.out.println(CONNECTION_CLOSED);
             clientChannel.close();
             return null;
         }
