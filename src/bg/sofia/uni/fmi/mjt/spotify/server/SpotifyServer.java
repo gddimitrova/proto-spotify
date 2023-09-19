@@ -4,11 +4,7 @@ import bg.sofia.uni.fmi.mjt.spotify.command.AvailableCommands;
 import bg.sofia.uni.fmi.mjt.spotify.command.Executor;
 import bg.sofia.uni.fmi.mjt.spotify.exceptions.SpotifyExceptions;
 
-import javax.sound.sampled.AudioFormat;
-import javax.sound.sampled.AudioInputStream;
-import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.UnsupportedAudioFileException;
-import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
@@ -21,17 +17,16 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class SpotifyServer implements Server {
-    private final InetSocketAddress socketAddress;
     private static final int BUFFER_SIZE = 1_000_000_012;
-    private static final int STREAM_BUFF = 100_000;
-    private static final int SONG_FRAME_SLEEP_TIME = 500;
-    private final ByteBuffer buffer;
-    private final Executor executor;
     private static final String ERROR = "ERROR:";
     private static final String SPACE = " ";
     private static final String SEMICOLON = ";";
+    private final InetSocketAddress socketAddress;
+    private final ByteBuffer buffer;
+    private final Executor executor;
+
     private final ConcurrentHashMap<Integer, Boolean> stopMap;
-    private final ServerHelper serverHelper;
+    private final ServerErrorHandler serverErrorHandler;
     private boolean shouldRun;
     private Selector selector;
 
@@ -40,7 +35,7 @@ public class SpotifyServer implements Server {
         this.stopMap = new ConcurrentHashMap<>();
         this.buffer = ByteBuffer.allocate(BUFFER_SIZE);
         this.executor = commandExecutor;
-        this.serverHelper = new ServerHelper();
+        this.serverErrorHandler = new ServerErrorHandler(this.buffer);
         this.shouldRun = true;
     }
 
@@ -77,38 +72,20 @@ public class SpotifyServer implements Server {
 
                     if (key.isAcceptable()) {
                         acceptClient(key, selector);
-
-                    } else if (key.isReadable()) {
+                    }
+                    if (key.isReadable()) {
                         SocketChannel commandChannel = (SocketChannel) key.channel();
 
-                        String clientInput = getClientInput(commandChannel);
-                        if (clientInput == null) {
-                            continue;
-                        }
-
-                        try {
-                            executionInput(commandChannel, clientInput);
-                        } catch (SpotifyExceptions e) {
-                            String errorMessage = String.join(SPACE, ERROR, e.getMessage());
-                            writeClient(commandChannel, errorMessage.getBytes(), true);
-
-                        } catch (UnsupportedAudioFileException | InterruptedException e) {
-                            String clientId = "Client ID: " + clientInput.substring(0, clientInput.indexOf(SPACE));
-                            String errorMessage = String.join(SPACE, ERROR, e.getMessage(), clientId);
-                            writeClient(commandChannel, errorMessage.getBytes(), true);
-                            serverHelper.handleSystemError(clientInput, e);
-                        }
+                        processInput(commandChannel);
                     }
                     keyIterator.remove();
                 }
             }
             selector.close();
         } catch (IOException e) {
-            String message = "There is a problem with the server socket!" + SPACE + e;
-            System.out.println(message);
-            serverHelper.handleSystemError("IO Exception", e);
+            System.out.println(String.join(SPACE, "There is a problem with the server socket!", e.toString()));
+            serverErrorHandler.handleSystemError("IO Exception", e);
         }
-
     }
 
     public void stop() {
@@ -119,7 +96,26 @@ public class SpotifyServer implements Server {
         }
     }
 
-    private void executionInput(SocketChannel commandChannel, String clientInput) throws IOException, SpotifyExceptions,
+    private void processInput(SocketChannel commandChannel) throws IOException {
+        String clientInput = getClientInput(commandChannel);
+
+        if (clientInput == null) {
+            return;
+        }
+
+        try {
+            executeInput(commandChannel, clientInput);
+        } catch (SpotifyExceptions e) {
+            serverErrorHandler.writeClientError(commandChannel, ERROR, e.getMessage());
+
+        } catch (UnsupportedAudioFileException | InterruptedException e) {
+            String clientId = "Client ID: " + clientInput.substring(0, clientInput.indexOf(SPACE));
+            serverErrorHandler.writeClientError(commandChannel, ERROR, e.getMessage(), clientId);
+            serverErrorHandler.handleSystemError(clientInput, e);
+        }
+    }
+
+    private void executeInput(SocketChannel commandChannel, String clientInput) throws IOException, SpotifyExceptions,
             UnsupportedAudioFileException, InterruptedException {
 
         String output = executor.execute(clientInput);
@@ -134,41 +130,29 @@ public class SpotifyServer implements Server {
                 stopMap.put(currId, false);
                 String fileName = output.split(SEMICOLON)[1];
 
-                Thread newThread = new Thread(() -> {
-                    try {
-                        playFunction(commandChannel, fileName, currId);
-                    } catch (UnsupportedAudioFileException | InterruptedException | IOException e) {
-                        String message = "ERROR occurred while playing song!";
-                        System.out.println(message);
-                        try {
-                            writeClient(commandChannel, message.getBytes(), true);
-                        } catch (IOException ex) {
-                            throw new RuntimeException(ex);
-                        }
-                        serverHelper.handleSystemError(clientInput, e);
-                    }
-                });
+                ServerPlay serverPlay = new ServerPlay(serverErrorHandler, commandChannel, fileName, currId,
+                        clientInput, buffer, stopMap);
+
+                Thread newThread = new Thread(serverPlay);
                 newThread.start();
             }
             if (shouldStopSong) {
                 stopMap.put(currId, true);
-                writeClient(commandChannel, AvailableCommands.STOP.getName().getBytes(), true);
+                writeClient(commandChannel, AvailableCommands.STOP.getName().getBytes());
             }
 
         } else {
-            writeClient(commandChannel, output.getBytes(), true);
+            writeClient(commandChannel, output.getBytes());
         }
     }
 
 
-    private void writeClient(SocketChannel clientChannel, byte[] output, boolean sendNewLine) throws IOException {
+    private void writeClient(SocketChannel clientChannel, byte[] output) throws IOException {
         buffer.clear();
         buffer.put(output);
-        if (sendNewLine) {
-            buffer.put(System.lineSeparator().getBytes());
-        }
-        buffer.flip();
+        buffer.put(System.lineSeparator().getBytes());
 
+        buffer.flip();
         clientChannel.write(buffer);
     }
     private void  acceptClient(SelectionKey key, Selector selector) throws IOException {
@@ -191,28 +175,5 @@ public class SpotifyServer implements Server {
 
         buffer.flip();
         return new String(buffer.array(), 0, buffer.remaining()).strip();
-    }
-
-    private void playFunction(SocketChannel clientChannel, String fileName, int id)
-            throws UnsupportedAudioFileException, IOException, InterruptedException {
-
-        AudioInputStream stream = AudioSystem.getAudioInputStream(new File(fileName));
-        AudioFormat audioFormat = stream.getFormat();
-
-        String newString = audioFormat.getEncoding() + SPACE + audioFormat.getSampleRate() + SPACE +
-                audioFormat.getSampleSizeInBits() + SPACE + audioFormat.getChannels()
-                + SPACE + audioFormat.getFrameSize() + SPACE + audioFormat.getFrameRate()
-                + SPACE + audioFormat.isBigEndian();
-
-        writeClient(clientChannel, newString.getBytes(), true);
-
-        byte[] bytesBuffer = new byte[STREAM_BUFF];
-        while (stream.read(bytesBuffer, 0, bytesBuffer.length) != -1 && !stopMap.get(id)) {
-            writeClient(clientChannel, bytesBuffer, false);
-            Thread.sleep(SONG_FRAME_SLEEP_TIME);
-        }
-
-        writeClient(clientChannel, new byte[1], false);
-        stream.close();
     }
 }
