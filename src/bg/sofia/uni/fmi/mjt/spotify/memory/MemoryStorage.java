@@ -17,7 +17,7 @@ import java.util.Map;
 public class MemoryStorage {
     private static final int ZERO = 0;
     private static final int ONE = 1;
-    
+
     private final Reader userReader;
     private final Reader songReader;
 
@@ -61,7 +61,6 @@ public class MemoryStorage {
             throw new RuntimeException(e);
         }
         currId++;
-
     }
 
     private void setUpSongs() {
